@@ -320,7 +320,9 @@ All destructive calls require the exact `'yes'` confirmation token.
 
 ## Scheduling
 
-pg_cron is optional. With pg_cron installed, `ash.start('1 second')` schedules:
+pg_cron is optional. For pg_cron scheduling, install pg_ash in the database
+named by `cron.database_name`; it still observes activity from every database.
+With pg_cron installed, `ash.start('1 second')` schedules:
 
 - sampling
 - raw partition rotation
