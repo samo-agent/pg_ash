@@ -378,9 +378,10 @@ select ash.rebuild_partitions(9, 'yes');
 select ash.start();
 ```
 
-`rebuild_partitions()` drops all raw samples and query-map partitions. Rollups
-survive. Re-run `ash.grant_reader()` for monitoring roles afterward because
-new partitions need fresh grants.
+`rebuild_partitions()` drops all raw samples and recreates the query-map view
+and raw sample/query-map partitions. Rollups survive. Complete
+`ash.grant_reader()` bundles are preserved automatically across the rebuild,
+including the installer-default `pg_monitor` bundle.
 
 Typical storage at 1-second sampling:
 
