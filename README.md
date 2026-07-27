@@ -50,9 +50,22 @@ select * from ash.chart(since => now() - interval '5 minutes', color => true);
 pg_ash can render compact terminal charts with ANSI colors when `color => true`
 or `set ash.color = on` is used.
 
-![pg_ash colored wait-event breakdown](assets/top_waits_color.jpg)
+<img src="assets/chart.svg" alt="ash.chart() rendering Average Active Sessions per minute, stacked by wait event, in 24-bit color">
 
-![pg_ash colored AAS timeline chart](assets/timeline_chart_color.jpg)
+`ash.chart()` — Average Active Sessions per minute, stacked by wait event, in
+24-bit color straight out of `psql`. The glyph varies per series (`█ ▓ ░ ▒ ·`)
+as well as the color, so the ranking still reads correctly for colorblind
+viewers and in a monochrome terminal.
+
+<img src="assets/top_event.svg" alt="ash.top('wait_event') ranking the wait-event breakdown for an incident window by Average Active Sessions">
+
+`ash.top('wait_event')` — the wait-event breakdown for the incident window,
+ranked by Average Active Sessions, with the share of total active time. When
+`Lock:transactionid` dominates, the database is not short of capacity — writers
+are queueing behind one another's row locks.
+
+Every image above is real `ash.*` output over real samples, regenerated with
+`make -C demos stills`. See [demos/README.md](demos/README.md).
 
 For the latest stable v1.5 tag, check out `v1.5` first and use:
 
