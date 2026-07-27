@@ -3829,7 +3829,8 @@ set jit = off
 set search_path = pg_catalog, ash
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_start_ts int4;
   v_end_ts int4;
@@ -3841,6 +3842,11 @@ declare
   v_tie boolean;
   v_raw_start timestamptz;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.aas: since must be less than or equal to until';
+  end if;
+
   v_bucket_secs := extract(epoch from bucket)::int4;
   if v_bucket_secs is null or v_bucket_secs < 60 then
     raise exception 'bucket must be at least 1 minute, got %', bucket;
@@ -3976,7 +3982,8 @@ set jit = off
 set search_path = pg_catalog, ash
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_start_ts int4;
   v_end_ts int4;
@@ -3989,6 +3996,11 @@ declare
   v_tie boolean;
   v_raw_start timestamptz;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.timeline: since must be less than or equal to until';
+  end if;
+
   v_start_ts := (ash.ts_from_timestamptz(v_from) / 60) * 60;
   v_end_ts := (ash.ts_from_timestamptz(v_to) / 60) * 60;
   -- overflow-safe empty/degenerate-window guard (#63).
@@ -4415,7 +4427,8 @@ set jit = off
 set search_path = pg_catalog, ash, public
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_start_ts int4;
   v_end_ts int4;
@@ -4429,6 +4442,11 @@ declare
   v_pgss_schema text;
   v_key_num bigint;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.top: since must be less than or equal to until';
+  end if;
+
   if dimension not in (
        'wait_event_type', 'wait_event', 'query_id', 'database'
      ) then
@@ -4637,6 +4655,12 @@ set jit = off
 set search_path = pg_catalog, ash, public
 as $$
 declare
+  v_from1 timestamptz := coalesce(
+    since_1, until_1 - interval '1 hour', now() - interval '1 hour');
+  v_to1 timestamptz := coalesce(until_1, now());
+  v_from2 timestamptz := coalesce(
+    since_2, until_2 - interval '1 hour', now() - interval '1 hour');
+  v_to2 timestamptz := coalesce(until_2, now());
   v_aas1 record;
   v_aas2 record;
   v_cov1 boolean;
@@ -4653,6 +4677,14 @@ begin
       'wait_event_type|wait_event|query_id|database '
       '(or null for one overall row)', dimension;
   end if;
+  if v_from1 > v_to1 then
+    raise exception
+      'ash.compare: since_1 must be less than or equal to until_1';
+  end if;
+  if v_from2 > v_to2 then
+    raise exception
+      'ash.compare: since_2 must be less than or equal to until_2';
+  end if;
 
   /*
    * Per-window coverage probe (rollup-backed, cheap). buckets_with_data = 0
@@ -4660,9 +4692,9 @@ begin
    * caller is warned: comparing against an uncovered window says nothing
    * about a regression.
    */
-  select * into v_aas1 from ash.aas(since_1, until_1,
+  select * into v_aas1 from ash.aas(v_from1, v_to1,
     wait_event_type, wait_event, query_id, database, bucket);
-  select * into v_aas2 from ash.aas(since_2, until_2,
+  select * into v_aas2 from ash.aas(v_from2, v_to2,
     wait_event_type, wait_event, query_id, database, bucket);
   v_cov1 := v_aas1.buckets_with_data > 0;
   v_cov2 := v_aas2.buckets_with_data > 0;
@@ -4699,11 +4731,11 @@ begin
 
   return query
   with window1 as (
-    select * from ash.top(dimension, since_1, until_1,
+    select * from ash.top(dimension, v_from1, v_to1,
       wait_event_type, wait_event, query_id, database, 2147483647, bucket)
   ),
   window2 as (
-    select * from ash.top(dimension, since_2, until_2,
+    select * from ash.top(dimension, v_from2, v_to2,
       wait_event_type, wait_event, query_id, database, 2147483647, bucket)
   )
   select
@@ -4808,7 +4840,8 @@ set jit = off
 set search_path = pg_catalog, ash, public
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_start int4;
   v_end int4;
@@ -4817,6 +4850,11 @@ declare
   v_has_pgss boolean := false;
   v_pgss_schema text;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.samples: since must be less than or equal to until';
+  end if;
+
   v_start := ash.ts_from_timestamptz(v_from);
   v_end := ash.ts_from_timestamptz(v_to);
   v_slots := ash._active_slots_for_at(v_from, v_to);
@@ -5062,7 +5100,8 @@ set jit = off
 set search_path = pg_catalog, ash
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 day');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 day');
   v_to timestamptz := coalesce(until, now());
   v_start_ts int4;
   v_end_ts int4;
@@ -5098,6 +5137,11 @@ declare
   v_t99_thr numeric;
   v_t999_thr numeric;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.report: since must be less than or equal to until';
+  end if;
+
   v_start_ts := (ash.ts_from_timestamptz(v_from) / 60) * 60;
   v_end_ts := (ash.ts_from_timestamptz(v_to) / 60) * 60;
   -- overflow-safe empty/degenerate-window guard (#63).
@@ -5459,7 +5503,8 @@ set jit = off
 set search_path = pg_catalog, ash
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_start_ts int4;
   v_end_ts int4;
@@ -5484,6 +5529,11 @@ declare
   v_i int;
   v_char_count int;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.chart: since must be less than or equal to until';
+  end if;
+
   width := least(greatest(width, 1), 500);
   v_start_ts := (ash.ts_from_timestamptz(v_from) / 60) * 60;
   v_end_ts := (ash.ts_from_timestamptz(v_to) / 60) * 60;
@@ -5689,12 +5739,18 @@ set jit = off
 set search_path = pg_catalog, ash, public
 as $$
 declare
-  v_from timestamptz := coalesce(since, now() - interval '1 hour');
+  v_from timestamptz := coalesce(
+    since, until - interval '1 hour', now() - interval '1 hour');
   v_to timestamptz := coalesce(until, now());
   v_aas record;
   v_rec record;
   v_rank int;
 begin
+  if v_from > v_to then
+    raise exception
+      'ash.summary: since must be less than or equal to until';
+  end if;
+
   select * into v_aas from ash.aas(v_from, v_to);
   if v_aas.buckets_with_data = 0 then
     return query select 'status'::text, 'no data in this time range'::text;
